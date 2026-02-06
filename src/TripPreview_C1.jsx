@@ -81,9 +81,25 @@ function EditableText({
   as = "div",
   placeholder,
   spellCheck = false,
+  disabled = false,
   ...rest
 }) {
   const Tag = as;
+
+  // view 模式：純顯示（不可編輯）
+  if (disabled) {
+    return (
+      <Tag
+        {...rest}
+        className={className}
+        style={{ whiteSpace: "pre-wrap", ...(rest.style || {}) }}
+      >
+        {value || ""}
+      </Tag>
+    );
+  }
+
+  // edit 模式：可直接點文字編輯
   return (
     <Tag
       {...rest}
@@ -213,7 +229,7 @@ function ItineraryTile({
 
         {/* 右側文字：只留 行程名稱 + Google Map */}
         <div className="flex-1 min-w-0">
-          <EditableText
+          <EditableText disabled={isView}
             value={item.label}
             onChange={onChangeLabel}
             className="text-[17px] leading-6 font-medium"
@@ -235,19 +251,54 @@ function ItineraryTile({
                   >
                     在地圖中開啟
                   </span>
+
+                  {/* ✅ C1：編輯模式可快速貼上/更新連結；朋友版不顯示 */}
+                  {isEdit && (
+                    <button
+                      type="button"
+                      className="ml-2 text-[12px] underline opacity-70 hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = window.prompt(
+                          "貼上/更新 Google Maps 連結（留空 = 清除）",
+                          item.url || ""
+                        );
+                        if (next === null) return;
+                        onChangeUrl(next);
+                      }}
+                    >
+                      更新連結
+                    </button>
+                  )}
                 </div>
-                {/* 顯示連結的簡短提示（不顯示完整網址） */}
-                <div className="text-[11px] opacity-60 truncate">
-                  {item.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}
-                </div>
+
+                {/* 只在編輯模式顯示連結網域提示，避免朋友版太雜/暴露網址 */}
+                {isEdit && (
+                  <div className="text-[11px] opacity-60 truncate">
+                    {item.url
+                      .replace(/^https?:\/\//, "")
+                      .replace(/\/.*$/, "")}
+                  </div>
+                )}
               </>
-            ) : (
-              <EditableText
-                value={item.url}
-                onChange={onChangeUrl}
-                className="text-[12px] italic"
-                placeholder="貼上 Google Maps 連結（尚未設定）"
-              />
+            ) : isView ? null : (
+              <div className="flex items-center gap-2">
+                <MapPin size={13} className="opacity-60" />
+                <span
+                  className="underline cursor-pointer opacity-80 hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = window.prompt(
+                      "貼上 Google Maps 連結（可留空先當候補）",
+                      ""
+                    );
+                    if (next === null) return;
+                    onChangeUrl(next);
+                  }}
+                >
+                  貼上 Google Maps 連結
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -345,46 +396,158 @@ export default function EditableTripPreview() {
       if (saved) return JSON.parse(saved).days || [];
     } catch (e) {}
     // 3) 預設
+    // ⚠️ 安全備份：舊版預設行程（不使用，只保留避免你擔心「被刪掉」）
+    // const LEGACY_DEFAULT_DAYS = [
+    //   {
+    //     day: 1,
+    //     label: "第一天",
+    //     itinerary: [
+    //       { type: "食物", label: "早餐—镒记茶餐室", url: "" },
+    //       { type: "景點", label: "聖瑪利亞教堂", url: "" },
+    //       { type: "景點", label: "獨立廣場", url: "" },
+    //       { type: "景點", label: "中央市場", url: "" },
+    //       { type: "食物", label: "午餐—自由尋吃（金蓮記福建麵 / 麗豐啦啦米）", url: "" },
+    //       { type: "景點", label: "Pavilion", url: "" },
+    //       { type: "景點", label: "雙峰塔", url: "" },
+    //       { type: "食物", label: "飲料—霸王茶姬", url: "" },
+    //       { type: "點心", label: "點心—Dury Dury Durian", url: "" },
+    //       { type: "食物", label: "晚餐—肉骨茶 / 瓦煲雞飯", url: "" },
+    //     ],
+    //   },
+    //   {
+    //     day: 2,
+    //     label: "第二天",
+    //     itinerary: [
+    //       { type: "食物", label: "早餐—ICC pudu / 魚頭米粉", url: "" },
+    //       { type: "景點", label: "黑風洞（要搭車）", url: "" },
+    //       { type: "食物", label: "午餐—Kiara 163 nls 椰漿飯", url: "" },
+    //       { type: "景點", label: "Hextar World", url: "" },
+    //       { type: "景點", label: "Desa Park City", url: "" },
+    //       { type: "食物", label: "晚餐—（待定）", url: "" },
+    //       { type: "景點", label: "（晚餐後景點：待補）", url: "" },
+    //     ],
+    //   },
+    //   {
+    //     day: 3,
+    //     label: "第三天",
+    //     itinerary: [
+    //       { type: "食物", label: "早餐—何久茶室", url: "" },
+    //       { type: "景點", label: "Taman Eko Rimba", url: "" },
+    //       { type: "景點", label: "Perdana Botanical Garden（大自然）", url: "" },
+    //       { type: "食物", label: "午餐—恩記海南雞飯", url: "" },
+    //       { type: "食物", label: "晚餐—待定（hop on hop off）", url: "" },
+    //       { type: "行程", label: "唱歌", url: "" },
+    //     ],
+    //   },
+    // ];
+
+    // ✅ 目前最終正本（含地圖連結；沒有的維持候補/空白）
     return [
       {
         day: 1,
         label: "第一天",
         itinerary: [
-          { type: "食物", label: "早餐—镒记茶餐室", url: "" },
-          { type: "景點", label: "聖瑪利亞教堂", url: "" },
-          { type: "景點", label: "獨立廣場", url: "" },
-          { type: "景點", label: "中央市場", url: "" },
-          { type: "食物", label: "午餐—自由尋吃（金蓮記福建麵 / 麗豐啦啦米）", url: "" },
-          { type: "景點", label: "Pavilion", url: "" },
-          { type: "景點", label: "雙峰塔", url: "" },
+          {
+            type: "食物",
+            label: "早餐—镒记茶餐室",
+            url: "https://www.google.com/maps/place/镒记茶餐室/data=!4m2!3m1!1s0x31cc482c1e868c0d:0xb674598b12ad056?sa=X&ved=1t:242&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "聖瑪利亞教堂",
+            url: "https://www.google.com/maps/place/St+Mary's+Cathedral/@3.150278,101.6934342,17z/data=!3m1!4b1!4m6!3m5!1s0x31cc49cd3d6d5231:0x8d3f1ce01df008ce!8m2!3d3.150278!4d101.6934342!16s/m/02q90wx?entry=ttu&g_ep=EgoyMDI2MDIwMy4wIKXMDSoASAFQAw==",
+          },
+          {
+            type: "景點",
+            label: "獨立廣場",
+            url: "https://www.google.com/maps/place/Dataran+Merdeka/data=!4m2!3m1!1s0x31cc49cd98881539:0x340bf906bc763359?sa=X&ved=1t:155783&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "中央市場",
+            url: "https://www.google.com/maps/place/Central+Market/data=!4m2!3m1!1s0x0:0xfcb30d4a9ca26002?sa=X&ved=1t:2428&ictx=111",
+          },
+          {
+            type: "食物",
+            label: "午餐—自由尋吃（金蓮記福建麵）",
+            url: "https://www.google.com/maps/place/金蓮記福建麵+馬來西亞/data=!4m2!3m1!1s0x31cc49d1b22732cb:0x8aafb3c5a4931138?sa=X&ved=1t:242&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "景點—雙峰塔",
+            url: "https://www.google.com/maps/search/KLCC/@3.1566815,101.7131746,17z?entry=s&sa=X&ved=1t:199789",
+          },
           { type: "食物", label: "飲料—霸王茶姬", url: "" },
-          { type: "點心", label: "點心—Dury Dury Durian", url: "" },
-          { type: "食物", label: "晚餐—肉骨茶 / 瓦煲雞飯", url: "" },
+          {
+            type: "食物",
+            label: "晚餐—瓦煲雞飯",
+            url: "https://www.google.com/maps/place/Restoran+Gafan/data=!4m2!3m1!1s0x31cc35a52810ac59:0x7ab327a7bdcb7d86?sa=X&ved=1t:242&ictx=111",
+          },
         ],
       },
       {
         day: 2,
         label: "第二天",
         itinerary: [
-          { type: "食物", label: "早餐—ICC pudu / 魚頭米粉", url: "" },
-          { type: "景點", label: "黑風洞（要搭車）", url: "" },
-          { type: "食物", label: "午餐—Kiara 163 nls 椰漿飯", url: "" },
-          { type: "景點", label: "Hextar World", url: "" },
-          { type: "景點", label: "Desa Park City", url: "" },
-          { type: "食物", label: "晚餐—（待定）", url: "" },
-          { type: "景點", label: "（晚餐後景點：待補）", url: "" },
+          {
+            type: "食物",
+            label: "早餐—ICC Pudu",
+            url: "https://www.google.com/maps/place/ICC+Pudu/data=!4m2!3m1!1s0x31cc36243c03ec4b:0xabc6c127472ea5a4?sa=X&ved=1t:242&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "黑風洞（需搭車）",
+            url: "https://www.google.com/maps/place/黑風洞/data=!4m2!3m1!1s0x31cc470c8949a805:0xf2bfebb2b36f9ef9?sa=X&ved=1t:155783&ictx=111",
+          },
+          {
+            type: "食物",
+            label: "午餐—Kiara 163 NLS 椰漿飯",
+            url: "https://www.google.com/maps/place/Nasi+Lemak+Shop+@+Sunway+163+Mall/data=!4m2!3m1!1s0x0:0x97b6cd937335fb31?sa=X&ved=1t:2428&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "景點—Hextar World",
+            url: "https://www.google.com/maps/place/Hextar+World+at+Empire+City/data=!4m2!3m1!1s0x0:0x274122fa6a84be99?sa=X&ved=1t:2428&ictx=111",
+          },
+          {
+            type: "食物",
+            label: "晚餐—Neighbourhood Food Court",
+            url: "https://www.google.com/maps/place/Neighbourhood+Food+Court/data=!4m2!3m1!1s0x31cc4edff1ed1703:0x852080c5759f684e?sa=X&ved=1t:242&ictx=111",
+          },
+          { type: "景點", label: "晚餐後景點—（待補）可能可以移步回去", url: "" },
         ],
       },
       {
         day: 3,
         label: "第三天",
         itinerary: [
-          { type: "食物", label: "早餐—何久茶室", url: "" },
-          { type: "景點", label: "Taman Eko Rimba", url: "" },
-          { type: "景點", label: "Perdana Botanical Garden（大自然）", url: "" },
-          { type: "食物", label: "午餐—恩記海南雞飯", url: "" },
-          { type: "食物", label: "晚餐—待定（hop on hop off）", url: "" },
-          { type: "行程", label: "唱歌", url: "" },
+          { type: "點心", label: "港式點心—候補", url: "" },
+          {
+            type: "景點",
+            label: "景點—Taman Eko Rimba",
+            url: "https://www.google.com/maps/place/Taman+Eko+Rimba+KL/data=!4m2!3m1!1s0x31cc35127ffc0bbf:0x91b0444f75621d44?sa=X&ved=1t:155783&ictx=111",
+          },
+          {
+            type: "食物",
+            label: "午餐—雞飯（或其他選擇）",
+            url: "https://www.google.com/maps/place/Nasi+Ayam+Hainan+Chee+Meng+(Bukit+Bintang)/data=!4m2!3m1!1s0x31cc3629992893d5:0xc1468ecfd7d4d4b5?sa=X&ved=1t:242&ictx=111",
+          },
+          {
+            type: "景點",
+            label: "景點—Pavilion",
+            url: "https://www.google.com/maps/place/Pavilion+Kuala+Lumpur/data=!4m2!3m1!1s0x0:0xed966c50b0a79fb4?sa=X&ved=1t:2428&ictx=111",
+          },
+          {
+            type: "點心",
+            label: "點心—Dury Dury Durian",
+            url: "https://www.google.com/maps/place/Dury+Dury+Durian/data=!4m2!3m1!1s0x31cc490048d071c1:0x6ab0a76c8753f1d3?sa=X&ved=1t:242&ictx=111",
+          },
+          { type: "食物", label: "晚餐—待定（Hop On Hop Off）", url: "" },
+          {
+            type: "行程",
+            label: "行程—唱歌",
+            url: "https://www.google.com/maps/place/a+quiet+place+bukit+bintang/data=!4m2!3m1!1s0x31cc3703634f24f1:0x77c04813dc17142b?sa=X&ved=1t:242&ictx=111",
+          },
         ],
       },
     ];
@@ -525,7 +688,7 @@ export default function EditableTripPreview() {
       <div className="w-[420px] max-w-full px-4 py-8 pb-24 relative">
         {/* Header */}
         <div className="text-center mb-6">
-          <EditableText
+          <EditableText disabled={isView}
             value={meta.title}
             onChange={(v) => updateMeta("title", v)}
             as="h1"
@@ -534,7 +697,7 @@ export default function EditableTripPreview() {
           />
           <div className="mt-2 flex items-center justify-center gap-2 text-[#A39384]">
             <CalendarDays size={16} />
-            <EditableText
+            <EditableText disabled={isView}
               value={meta.dates}
               onChange={(v) => updateMeta("dates", v)}
               as="p"
@@ -545,130 +708,75 @@ export default function EditableTripPreview() {
         </div>
 
         {/* Day Switcher */}
-<div className="mb-5">
-  <div className="sticky top-3 z-30">
-    <div
-      className="rounded-3xl border border-white/45 bg-white/25 backdrop-blur-[14px] shadow-[0_14px_40px_rgba(0,0,0,.08)]"
-      style={{ WebkitBackdropFilter: "blur(14px)" }}
-    >
-      <div className="px-3 pt-3 pb-3">
-        {/* Quick Day Tabs */}
-        <div
-          className="flex items-center gap-2 overflow-x-auto pb-1"
-          style={{
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-          }}
-        >
-          {days.map((d) => {
-            const newIndex = days.findIndex((x) => x.day === d.day);
-            const dir =
-              newIndex === dayIndex ? 0 : newIndex > dayIndex ? 1 : -1;
-            const active = d.day === activeDay;
-            return (
+        <div className="mb-5">
+          <div
+            className="rounded-3xl border border-white/45 bg-white/25 backdrop-blur-[14px] shadow-[0_14px_40px_rgba(0,0,0,.08)]"
+            style={{ WebkitBackdropFilter: "blur(14px)" }}
+          >
+            <div className="flex items-center justify-between px-3 py-3">
+              {/* Left */}
               <button
-                key={d.day}
                 type="button"
-                onClick={() => {
-                  setDayDir(dir);
-                  setActiveDay(d.day);
-                }}
+                disabled={false}
+                onClick={() => { setDayDir(-1); leftDay && setActiveDay(leftDay.day); }}
                 className={
-                  "shrink-0 px-3 py-1.5 rounded-full text-[13px] transition border " +
-                  (active
-                    ? "bg-white/45 border-white/70 text-[#7B2A26] shadow-[0_10px_25px_rgba(0,0,0,.08)]"
-                    : "bg-white/15 border-white/35 text-[#525C44] opacity-80 hover:opacity-100")
+                  "flex-1 text-left px-2 py-2 rounded-2xl transition " +
+                  "opacity-40 hover:opacity-80"
                 }
-                aria-current={active ? "page" : undefined}
               >
-                Day {d.day}
+                <div className="text-[12px] text-[#A39384]">{leftDay ? "←" : ""}</div>
+                <EditableText disabled={isView}
+                  value={leftDay?.label || ""}
+                  onChange={(v) => leftDay && updateDayLabel(leftDay.day, v)}
+                  className="text-[13px] text-[#525C44]"
+                  placeholder=""
+                />
               </button>
-            );
-          })}
+
+              {/* Center */}
+              <motion.button
+                type="button"
+                onClick={() => setActiveDay(centerDay.day)}
+                className="flex-[1.1] text-center px-2 py-2 rounded-2xl bg-white/35 border border-white/60 shadow-[0_10px_25px_rgba(0,0,0,.08)]"
+                whileTap={{ scale: 0.98 }}
+              >
+                <EditableText disabled={isView}
+                  value={centerDay.label}
+                  onChange={(v) => updateDayLabel(centerDay.day, v)}
+                  className="text-[18px] font-semibold text-[#7B2A26]"
+                  placeholder="天數"
+                />
+              </motion.button>
+
+              {/* Right */}
+              <button
+                type="button"
+                disabled={!rightDay}
+                onClick={() => { setDayDir(1); rightDay && setActiveDay(rightDay.day); }}
+                className={
+                  "flex-1 text-right px-2 py-2 rounded-2xl transition " +
+                  (rightDay ? "opacity-70 hover:opacity-100" : "opacity-25 cursor-not-allowed")
+                }
+              >
+                <div className="text-[12px] text-[#A39384]">{rightDay ? "→" : ""}</div>
+                <EditableText disabled={isView}
+                  value={rightDay?.label || ""}
+                  onChange={(v) => rightDay && updateDayLabel(rightDay.day, v)}
+                  className="text-[13px] text-[#525C44]"
+                  placeholder=""
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 justify-center">
+            {tabs.map((t) => (
+              <Tab key={t} active={activeTab === t} onClick={() => setActiveTab(t)}>
+                {t}
+              </Tab>
+            ))}
+          </div>
         </div>
-
-        {/* Label + prev/next */}
-        <div className="mt-2 flex items-center justify-between gap-2">
-          {/* Left */}
-          <button
-            type="button"
-            disabled={len <= 1}
-            onClick={() => {
-              setDayDir(-1);
-              leftDay && setActiveDay(leftDay.day);
-            }}
-            className={
-              "flex-1 text-left px-2 py-2 rounded-2xl transition " +
-              (len > 1
-                ? "opacity-50 hover:opacity-90"
-                : "opacity-25 cursor-not-allowed")
-            }
-          >
-            <div className="text-[12px] text-[#A39384]">{len > 1 ? "←" : ""}</div>
-            <EditableText
-              value={len > 1 ? leftDay?.label || "" : ""}
-              onChange={(v) =>
-                len > 1 && leftDay && updateDayLabel(leftDay.day, v)
-              }
-              className="text-[13px] text-[#525C44]"
-              placeholder=""
-            />
-          </button>
-
-          {/* Center */}
-          <motion.button
-            type="button"
-            onClick={() => setActiveDay(centerDay.day)}
-            className="flex-[1.1] text-center px-2 py-2 rounded-2xl bg-white/35 border border-white/60 shadow-[0_10px_25px_rgba(0,0,0,.08)]"
-            whileTap={{ scale: 0.98 }}
-          >
-            <EditableText
-              value={centerDay.label}
-              onChange={(v) => updateDayLabel(centerDay.day, v)}
-              className="text-[18px] font-semibold text-[#7B2A26]"
-              placeholder="天數"
-            />
-          </motion.button>
-
-          {/* Right */}
-          <button
-            type="button"
-            disabled={len <= 1}
-            onClick={() => {
-              setDayDir(1);
-              rightDay && setActiveDay(rightDay.day);
-            }}
-            className={
-              "flex-1 text-right px-2 py-2 rounded-2xl transition " +
-              (len > 1
-                ? "opacity-70 hover:opacity-100"
-                : "opacity-25 cursor-not-allowed")
-            }
-          >
-            <div className="text-[12px] text-[#A39384]">{len > 1 ? "→" : ""}</div>
-            <EditableText
-              value={len > 1 ? rightDay?.label || "" : ""}
-              onChange={(v) =>
-                len > 1 && rightDay && updateDayLabel(rightDay.day, v)
-              }
-              className="text-[13px] text-[#525C44]"
-              placeholder=""
-            />
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* 你原本的 tabs 這段不要動，保留在下面 */}
-  <div className="mt-3 flex flex-wrap gap-2 justify-center">
-    {tabs.map((t) => (
-      <Tab key={t} active={activeTab === t} onClick={() => setActiveTab(t)}>
-        {t}
-      </Tab>
-    ))}
-  </div>
-</div>
 
         {/* Content */}
         <AnimatePresence mode="wait" custom={dayDir}>
@@ -761,17 +869,20 @@ export default function EditableTripPreview() {
               )
             ) : (
               <div className="text-[13px] text-[#A39384] bg-white/16 border border-white/30 rounded-2xl px-3 py-3">
-                這個分類目前沒有內容。你可以按「＋新增」。
+                {isView ? "這個分類目前沒有內容。" : "這個分類目前沒有內容。你可以按「＋新增」。"}
               </div>
             )}
 
-            <div className="mt-6 text-center text-[12px] text-[#A39384]">
-              小提示：點整個行程卡片會開地圖；要改字就直接點文字。
-            </div>
+            {!isView && (
+              <div className="mt-6 text-center text-[12px] text-[#A39384]">
+                小提示：點整個行程卡片會開地圖；要改字就直接點文字。
+              </div>
+            )}
 
-            {/* 使用者自訂溫馨提醒 */}
-            <div className="mt-8 px-3">
-              <EditableText
+            {/* 使用者自訂溫馨提醒（只在編輯模式顯示） */}
+            {!isView && (
+              <div className="mt-8 px-3">
+                <EditableText disabled={isView}
                 value={meta.note}
                 onChange={(v) => updateMeta("note", v)}
                 as="p"
