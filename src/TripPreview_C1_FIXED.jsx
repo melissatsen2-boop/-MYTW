@@ -82,6 +82,7 @@ function EditableText({
   placeholder,
   spellCheck = false,
   disabled = false,
+  stopPropagation = true,
   ...rest
 }) {
   const Tag = as;
@@ -111,8 +112,8 @@ function EditableText({
       suppressContentEditableWarning
       spellCheck={spellCheck}
       data-placeholder={placeholder}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => { if (stopPropagation) e.stopPropagation(); }}
+      onClick={(e) => { if (stopPropagation) e.stopPropagation(); }}
       onInput={(e) => onChange(e.currentTarget.textContent || "")}
       onBlur={(e) => onChange(safeTrim(e.currentTarget.textContent || ""))}
       style={{ WebkitUserSelect: "text", userSelect: "text", ...(rest.style || {}) }}
@@ -141,13 +142,13 @@ function Tab({ active, children, onClick }) {
 
 function ItineraryTile({
   item,
-  isView = false,
-  isEdit = true,
   onChangeLabel,
   onChangeUrl,
   onCycleType,
   onDelete,
   dragEnabled = false,
+  isView = false,
+  isEdit = true,
 }) {
   const Icon = typeIcon(item.type);
   const controls = useDragControls();
@@ -727,7 +728,7 @@ export default function EditableTripPreview() {
                 }
               >
                 <div className="text-[12px] text-[#A39384]">{leftDay ? "←" : ""}</div>
-                <EditableText disabled={isView}
+                <EditableText stopPropagation={false} disabled={isView}
                   value={leftDay?.label || ""}
                   onChange={(v) => leftDay && updateDayLabel(leftDay.day, v)}
                   className="text-[13px] text-[#525C44]"
@@ -742,7 +743,7 @@ export default function EditableTripPreview() {
                 className="flex-[1.1] text-center px-2 py-2 rounded-2xl bg-white/35 border border-white/60 shadow-[0_10px_25px_rgba(0,0,0,.08)]"
                 whileTap={{ scale: 0.98 }}
               >
-                <EditableText disabled={isView}
+                <EditableText stopPropagation={false} disabled={isView}
                   value={centerDay.label}
                   onChange={(v) => updateDayLabel(centerDay.day, v)}
                   className="text-[18px] font-semibold text-[#7B2A26]"
@@ -761,7 +762,7 @@ export default function EditableTripPreview() {
                 }
               >
                 <div className="text-[12px] text-[#A39384]">{rightDay ? "→" : ""}</div>
-                <EditableText disabled={isView}
+                <EditableText stopPropagation={false} disabled={isView}
                   value={rightDay?.label || ""}
                   onChange={(v) => rightDay && updateDayLabel(rightDay.day, v)}
                   className="text-[13px] text-[#525C44]"
@@ -843,9 +844,9 @@ export default function EditableTripPreview() {
                     <ItineraryTile
                       key={it.id}
                       item={it}
-                        isView={isView}
-                        isEdit={isEdit}
                       dragEnabled={true}
+                      isView={isView}
+                      isEdit={isEdit}
                       onChangeLabel={(v) => updateItem(centerDay.day, i, { label: v })}
                       onChangeUrl={(v) => updateItem(centerDay.day, i, { url: v })}
                       onCycleType={() => cycleType(centerDay.day, i)}
@@ -861,9 +862,9 @@ export default function EditableTripPreview() {
                       <ItineraryTile
                         key={it.id || idx}
                         item={it}
-                          isView={isView}
-                          isEdit={isEdit}
                         dragEnabled={false}
+                        isView={isView}
+                        isEdit={isEdit}
                         onChangeLabel={(v) => updateItem(centerDay.day, idx, { label: v })}
                         onChangeUrl={(v) => updateItem(centerDay.day, idx, { url: v })}
                         onCycleType={() => cycleType(centerDay.day, idx)}
