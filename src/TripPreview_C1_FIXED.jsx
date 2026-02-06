@@ -375,29 +375,32 @@ export default function EditableTripPreview() {
   const [meta, setMeta] = useState(() => {
     // 1) URL 分享資料（最高優先）
     if (sharedPayload?.meta) return sharedPayload.meta;
-    // 2) localStorage
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved).meta || { title: "馬上發福陽光團", dates: "2月11日至2月13日", note: "" };
-    } catch (e) {}
+    // 2) localStorage（只給編輯版用；朋友版不要吃到各自手機的舊資料）
+    if (!isView) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved).meta || { title: "馬上發福陽光團", dates: "2月11日至2月13日", note: "" };
+      } catch (e) {}
+    }
     // 3) 預設
     return { title: "馬上發福陽光團", dates: "2月11日至2月13日", note: "" };
   });
 
   const [activeDay, setActiveDay] = useState(1);
   const [dayDir, setDayDir] = useState(0);
-  const [activeTab, setActiveTab] = useState("全部");
 
   const [addType, setAddType] = useState("行程");
 
   const [days, setDays] = useState(() => {
     // 1) URL 分享資料（最高優先）
     if (sharedPayload?.days) return sharedPayload.days;
-    // 2) localStorage
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved).days || [];
-    } catch (e) {}
+    // 2) localStorage（只給編輯版用；朋友版永遠用你發佈/預設的版本）
+    if (!isView) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved).days || [];
+      } catch (e) {}
+    }
     // 3) 預設
     // ⚠️ 安全備份：舊版預設行程（不使用，只保留避免你擔心「被刪掉」）
     // const LEGACY_DEFAULT_DAYS = [
@@ -592,12 +595,8 @@ export default function EditableTripPreview() {
   const centerDay = days[dayIndex] || days[0];
   const rightDay = days[(dayIndex + 1) % len];
 
-  const tabs = ["全部", ...TYPES];
 
-  const visibleItems = useMemo(() => {
-    if (activeTab === "全部") return centerDay.itinerary;
-    return centerDay.itinerary.filter((it) => it.type === activeTab);
-  }, [centerDay, activeTab]);
+    const visibleItems = centerDay?.itinerary || [];
 
   function updateMeta(key, v) {
     setMeta((m) => ({ ...m, [key]: safeTrim(v) }));
@@ -660,15 +659,9 @@ export default function EditableTripPreview() {
     );
   }
 
-  // 將 visibleItems 的 idx 對回原 itinerary idx（分類時需要）
-  const indexMap = useMemo(() => {
-    if (activeTab === "全部") return centerDay.itinerary.map((_, i) => i);
-    const map = [];
-    centerDay.itinerary.forEach((it, i) => {
-      if (it.type === activeTab) map.push(i);
-    });
-    return map;
-  }, [centerDay, activeTab]);
+  // 將 visibleItems 的 idx 對回原 itinerary idx
+  const indexMap = useMemo(() => (centerDay?.itinerary || []).map((_, i) => i), [centerDay]);
+
 
   return (
     <div
@@ -772,19 +765,12 @@ export default function EditableTripPreview() {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2 justify-center">
-            {tabs.map((t) => (
-              <Tab key={t} active={activeTab === t} onClick={() => setActiveTab(t)}>
-                {t}
-              </Tab>
-            ))}
-          </div>
         </div>
 
         {/* Content */}
         <AnimatePresence mode="wait" custom={dayDir}>
           <motion.div
-            key={centerDay.day + "-" + activeTab}
+            key={centerDay.day}
             custom={dayDir}
             initial={(d) => ({ opacity: 0, x: d * 18 })}
             animate={{ opacity: 1, x: 0 }}
@@ -795,9 +781,7 @@ export default function EditableTripPreview() {
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="text-[13px] text-[#A39384]">
-                {activeTab === "全部"
-                  ? "依行程表順序（不分類）"
-                  : `分類：${activeTab}（只顯示此分類）`}
+                依行程表順序（不分類）
               </div>
 
               <div className="flex items-center gap-2">
@@ -827,7 +811,7 @@ export default function EditableTripPreview() {
             </div>
 
             {visibleItems?.length ? (
-              activeTab === "全部" ? (
+              !isView ? (
                 <Reorder.Group
                   axis="y"
                   values={centerDay.itinerary}
