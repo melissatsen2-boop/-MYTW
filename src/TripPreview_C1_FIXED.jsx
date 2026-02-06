@@ -141,6 +141,8 @@ function Tab({ active, children, onClick }) {
 
 function ItineraryTile({
   item,
+  isView = false,
+  isEdit = true,
   onChangeLabel,
   onChangeUrl,
   onCycleType,
@@ -841,6 +843,8 @@ export default function EditableTripPreview() {
                     <ItineraryTile
                       key={it.id}
                       item={it}
+                        isView={isView}
+                        isEdit={isEdit}
                       dragEnabled={true}
                       onChangeLabel={(v) => updateItem(centerDay.day, i, { label: v })}
                       onChangeUrl={(v) => updateItem(centerDay.day, i, { url: v })}
@@ -857,6 +861,8 @@ export default function EditableTripPreview() {
                       <ItineraryTile
                         key={it.id || idx}
                         item={it}
+                          isView={isView}
+                          isEdit={isEdit}
                         dragEnabled={false}
                         onChangeLabel={(v) => updateItem(centerDay.day, idx, { label: v })}
                         onChangeUrl={(v) => updateItem(centerDay.day, idx, { url: v })}
